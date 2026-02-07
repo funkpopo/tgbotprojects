@@ -420,6 +420,24 @@ export class LiveNotifyBot {
 
     // 启动 polling
     this.bot.startPolling();
+
+    // 注册命令菜单
+    this.bot.setMyCommands([
+      { command: 'start', description: '开始使用' },
+      { command: 'help', description: '显示帮助' },
+      { command: 'dy', description: '订阅斗鱼主播' },
+      { command: 'dyun', description: '取消斗鱼订阅' },
+      { command: 'dycheck', description: '查看斗鱼直播状态' },
+      { command: 'bl', description: '订阅B站主播' },
+      { command: 'blun', description: '取消B站订阅' },
+      { command: 'blcheck', description: '查看B站直播状态' },
+      { command: 'list', description: '查看订阅列表' },
+    ]).then(() => {
+      console.log('已注册命令菜单');
+    }).catch((e) => {
+      console.error('注册命令菜单失败:', e.message);
+    });
+
     console.log('直播开播通知 Bot 已启动');
     this.startLiveCheck();
   }
