@@ -326,8 +326,17 @@ export class LiveNotifyBot {
    * 检查所有平台的开播状态
    */
   async checkAllPlatforms() {
-    await this.checkPlatformLiveStatus('douyu', getRoomInfo);
-    await this.checkPlatformLiveStatus('bilibili', getBilibiliRoomInfo);
+    const douyuRooms = this.storage.getAllRoomIds('douyu');
+    const bilibiliRooms = this.storage.getAllRoomIds('bilibili');
+    console.log(`开播检测: 斗鱼 ${douyuRooms.length} 个房间, B站 ${bilibiliRooms.length} 个房间`);
+
+    if (douyuRooms.length === 0 && bilibiliRooms.length === 0) {
+      console.log('当前无订阅，跳过检测');
+      return;
+    }
+
+    await this.checkPlatformLiveStatus('douyu', getRoomInfo, douyuRooms);
+    await this.checkPlatformLiveStatus('bilibili', getBilibiliRoomInfo, bilibiliRooms);
   }
 
   /**
@@ -335,11 +344,8 @@ export class LiveNotifyBot {
    * @param {string} platform 平台名称
    * @param {Function} getRoomInfoFn 获取房间信息的函数
    */
-  async checkPlatformLiveStatus(platform, getRoomInfoFn) {
-    const roomIds = this.storage.getAllRoomIds(platform);
+  async checkPlatformLiveStatus(platform, getRoomInfoFn, roomIds) {
     if (roomIds.length === 0) return;
-
-    console.log(`检查 ${platform} ${roomIds.length} 个房间的开播状态...`);
 
     for (const roomId of roomIds) {
       try {
