@@ -24,7 +24,10 @@ const bot = new LiveNotifyBot(config.token, {
   dataFile: config.dataFile,
 });
 
-bot.start();
+bot.start().catch((err) => {
+  console.error('Bot 启动失败:', err.message);
+  process.exit(1);
+});
 
 // 优雅退出
 process.on('SIGINT', () => {
