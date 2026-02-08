@@ -301,6 +301,23 @@ export class LiveNotifyBot {
   }
 
   /**
+   * 获取当前北京时间格式化字符串
+   * @returns {string} 格式化后的北京时间，如 "2026-02-08 20:30:15"
+   */
+  getBeijingTime() {
+    return new Date().toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  }
+
+  /**
    * 启动开播检测
    */
   startLiveCheck() {
@@ -386,8 +403,7 @@ export class LiveNotifyBot {
       `平台：${platformName}\n` +
       `主播：${roomInfo.nickname}\n` +
       `房间：${roomInfo.roomName}\n` +
-      `分类：${roomInfo.categoryName}\n` +
-      `人气：${this.formatNumber(roomInfo.online)}\n\n` +
+      `开播时间：${this.getBeijingTime()}\n\n` +
       `[点击进入直播间](${roomInfo.roomUrl})`;
 
     for (const chatId of subscribers) {
