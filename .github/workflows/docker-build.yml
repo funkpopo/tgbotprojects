@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '镜像标签 (例如: latest, v1.0.0)'
+        description: ''
         required: false
         default: 'latest'
         type: string
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: funkpopo/sub-bot
 
 jobs:
   build-and-push:
