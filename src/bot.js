@@ -1,11 +1,12 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { getRoomInfo } from './douyu.js';
 import { getBilibiliRoomInfo } from './bilibili.js';
+import { getTwitchChannelInfo } from './twitch.js';
 import { Storage } from './storage.js';
 
 /**
  * 直播开播通知 Bot
- * 支持斗鱼和B站
+ * 支持斗鱼、B站和Twitch
  */
 export class LiveNotifyBot {
   constructor(token, options = {}) {
@@ -48,6 +49,21 @@ export class LiveNotifyBot {
   }
 
   /**
+   * 获取 Reply Keyboard 菜单
+   */
+  getMenuKeyboard() {
+    return {
+      reply_markup: {
+        keyboard: [
+          [{ text: '📋 订阅列表' }, { text: '❓ 帮助' }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true,
+      },
+    };
+  }
+
+  /**
    * 设置 Bot 命令
    */
   setupCommands() {
@@ -56,17 +72,20 @@ export class LiveNotifyBot {
       const chatId = msg.chat.id;
       this.bot.sendMessage(chatId,
         `直播开播通知 Bot\n\n` +
-        `支持平台：斗鱼、B站\n\n` +
+        `支持平台：斗鱼、B站、Twitch\n\n` +
         `斗鱼命令\n` +
         `/dy <房间号> - 订阅斗鱼主播\n` +
         `/dyun <房间号> - 取消斗鱼订阅\n\n` +
         `B站命令\n` +
         `/bl <房间号> - 订阅B站主播\n` +
         `/blun <房间号> - 取消B站订阅\n\n` +
+        `Twitch命令\n` +
+        `/tw <频道名> - 订阅Twitch频道\n` +
+        `/twun <频道名> - 取消Twitch订阅\n\n` +
         `通用命令\n` +
         `/list - 查看订阅列表\n` +
         `/help - 显示帮助`,
-        { parse_mode: 'Markdown' }
+        { parse_mode: 'Markdown', ...this.getMenuKeyboard() }
       );
     });
 
@@ -83,18 +102,25 @@ export class LiveNotifyBot {
         `/bl <房间号> - 订阅B站主播\n` +
         `/blun <房间号> - 取消B站订阅\n` +
         `/blcheck <房间号> - 查看B站直播状态\n\n` +
+        `*Twitch直播*\n` +
+        `/tw <频道名> - 订阅Twitch频道\n` +
+        `/twun <频道名> - 取消Twitch订阅\n` +
+        `/twcheck <频道名> - 查看Twitch直播状态\n\n` +
         `*通用命令*\n` +
         `/list - 查看所有订阅\n\n` +
         `*示例*\n` +
         `/dy 9999 - 订阅斗鱼房间9999\n` +
-        `/bl 21452505 - 订阅B站房间21452505`,
+        `/bl 21452505 - 订阅B站房间21452505\n` +
+        `/tw shroud - 订阅Twitch频道shroud`,
         { parse_mode: 'Markdown' }
       );
     });
 
     this.setupDouyuCommands();
     this.setupBilibiliCommands();
+    this.setupTwitchCommands();
     this.setupListCommand();
+    this.setupMenuButtonHandlers();
   }
 
   /**
@@ -238,6 +264,77 @@ export class LiveNotifyBot {
   }
 
   /**
+   * 设置Twitch相关命令
+   */
+  setupTwitchCommands() {
+    // /tw 订阅Twitch
+    this.bot.onText(/\/tw(?:@\w+)?\s+(\S+)/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const channelName = match[1].toLowerCase();
+
+      const channelInfo = await getTwitchChannelInfo(channelName);
+      if (!channelInfo) {
+        this.bot.sendMessage(chatId, `Twitch 频道 ${channelName} 不存在或获取信息失败`);
+        return;
+      }
+
+      const added = this.storage.addSubscription(String(chatId), 'twitch', channelName);
+      if (added) {
+        this.bot.sendMessage(chatId,
+          `Twitch订阅成功！\n\n` +
+          `主播：${channelInfo.nickname}\n` +
+          `状态：${channelInfo.isLive ? '直播中' : '未开播'}\n` +
+          `链接：${channelInfo.roomUrl}\n\n` +
+          `/list 查看订阅列表 | /twun ${channelName} 取消订阅`
+        );
+      } else {
+        this.bot.sendMessage(chatId, `你已经订阅了Twitch频道 ${channelName}\n\n/list 查看订阅列表`);
+      }
+    });
+
+    // /twun 取消Twitch订阅
+    this.bot.onText(/\/twun(?:@\w+)?\s+(\S+)/, (msg, match) => {
+      const chatId = msg.chat.id;
+      const channelName = match[1].toLowerCase();
+
+      const removed = this.storage.removeSubscription(String(chatId), 'twitch', channelName);
+      if (removed) {
+        this.bot.sendMessage(chatId, `已取消Twitch频道 ${channelName} 的订阅\n\n/tw <频道名> 重新订阅 | /list 查看订阅列表`);
+      } else {
+        this.bot.sendMessage(chatId, `你没有订阅Twitch频道 ${channelName}\n\n/tw ${channelName} 订阅该频道`);
+      }
+    });
+
+    // /twcheck 查看Twitch直播状态
+    this.bot.onText(/\/twcheck(?:@\w+)?\s+(\S+)/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const channelName = match[1].toLowerCase();
+
+      const channelInfo = await getTwitchChannelInfo(channelName);
+      if (!channelInfo) {
+        this.bot.sendMessage(chatId, `Twitch 频道 ${channelName} 不存在或获取信息失败`);
+        return;
+      }
+
+      const status = channelInfo.isLive ? '直播中' : '未开播';
+      let message = `Twitch频道状态\n\n` +
+        `主播：${channelInfo.nickname}\n` +
+        `标题：${channelInfo.roomName}\n` +
+        `状态：${status}\n`;
+
+      if (channelInfo.categoryName) {
+        message += `分类：${channelInfo.categoryName}\n`;
+      }
+      if (channelInfo.isLive) {
+        message += `观众：${this.formatNumber(channelInfo.online)}\n`;
+      }
+
+      message += `链接：${channelInfo.roomUrl}`;
+      this.bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    });
+  }
+
+  /**
    * 设置列表命令
    */
   setupListCommand() {
@@ -247,8 +344,9 @@ export class LiveNotifyBot {
 
       const hasDouyu = subs.douyu.length > 0;
       const hasBilibili = subs.bilibili.length > 0;
+      const hasTwitch = (subs.twitch || []).length > 0;
 
-      if (!hasDouyu && !hasBilibili) {
+      if (!hasDouyu && !hasBilibili && !hasTwitch) {
         this.bot.sendMessage(chatId, '你还没有订阅任何主播');
         return;
       }
@@ -281,10 +379,43 @@ export class LiveNotifyBot {
         }
       }
 
+      if (hasTwitch) {
+        message += '\nTwitch\n';
+        for (const channelName of subs.twitch) {
+          const channelInfo = await getTwitchChannelInfo(channelName);
+          if (channelInfo) {
+            const status = channelInfo.isLive ? '直播中' : '未开播';
+            message += `${status} [${channelInfo.nickname}](${channelInfo.roomUrl})\n`;
+          } else {
+            message += `频道 ${channelName} (获取信息失败)\n`;
+          }
+        }
+      }
+
       this.bot.sendMessage(chatId, message, {
         parse_mode: 'Markdown',
         disable_web_page_preview: true
       });
+    });
+  }
+
+  /**
+   * 设置菜单按钮的文本消息处理
+   */
+  setupMenuButtonHandlers() {
+    this.bot.on('message', (msg) => {
+      if (!msg.text || msg.text.startsWith('/')) return;
+
+      switch (msg.text) {
+        case '📋 订阅列表':
+          msg.text = '/list';
+          this.bot.emit('text', msg);
+          break;
+        case '❓ 帮助':
+          msg.text = '/help';
+          this.bot.emit('text', msg);
+          break;
+      }
     });
   }
 
@@ -345,15 +476,17 @@ export class LiveNotifyBot {
   async checkAllPlatforms() {
     const douyuRooms = this.storage.getAllRoomIds('douyu');
     const bilibiliRooms = this.storage.getAllRoomIds('bilibili');
-    console.log(`开播检测: 斗鱼 ${douyuRooms.length} 个房间, B站 ${bilibiliRooms.length} 个房间`);
+    const twitchChannels = this.storage.getAllRoomIds('twitch');
+    console.log(`开播检测: 斗鱼 ${douyuRooms.length} 个房间, B站 ${bilibiliRooms.length} 个房间, Twitch ${twitchChannels.length} 个频道`);
 
-    if (douyuRooms.length === 0 && bilibiliRooms.length === 0) {
+    if (douyuRooms.length === 0 && bilibiliRooms.length === 0 && twitchChannels.length === 0) {
       console.log('当前无订阅，跳过检测');
       return;
     }
 
     await this.checkPlatformLiveStatus('douyu', getRoomInfo, douyuRooms);
     await this.checkPlatformLiveStatus('bilibili', getBilibiliRoomInfo, bilibiliRooms);
+    await this.checkPlatformLiveStatus('twitch', getTwitchChannelInfo, twitchChannels);
   }
 
   /**
@@ -395,7 +528,8 @@ export class LiveNotifyBot {
     const subscribers = this.storage.getSubscribers(platform, roomId);
     if (subscribers.length === 0) return;
 
-    const platformName = platform === 'douyu' ? '斗鱼' : 'B站';
+    const platformNames = { douyu: '斗鱼', bilibili: 'B站', twitch: 'Twitch' };
+    const platformName = platformNames[platform] || platform;
     console.log(`发送开播通知: ${platformName} ${roomInfo.nickname} (${roomId}) -> ${subscribers.length} 个订阅者`);
 
     const message =
@@ -447,6 +581,9 @@ export class LiveNotifyBot {
       { command: 'bl', description: '订阅B站主播' },
       { command: 'blun', description: '取消B站订阅' },
       { command: 'blcheck', description: '查看B站直播状态' },
+      { command: 'tw', description: '订阅Twitch频道' },
+      { command: 'twun', description: '取消Twitch订阅' },
+      { command: 'twcheck', description: '查看Twitch直播状态' },
       { command: 'list', description: '查看订阅列表' },
     ]).then(() => {
       console.log('已注册命令菜单');

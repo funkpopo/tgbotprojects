@@ -52,7 +52,11 @@ export class Storage {
     // 迁移旧的订阅数据格式
     for (const [chatId, value] of Object.entries(this.data.subscriptions)) {
       if (Array.isArray(value)) {
-        this.data.subscriptions[chatId] = { douyu: value, bilibili: [] };
+        this.data.subscriptions[chatId] = { douyu: value, bilibili: [], twitch: [] };
+      }
+      // 为已有用户补充 twitch 字段
+      if (value && !Array.isArray(value) && !value.twitch) {
+        value.twitch = [];
       }
     }
   }
@@ -81,7 +85,7 @@ export class Storage {
    */
   addSubscription(chatId, platform, roomId) {
     if (!this.data.subscriptions[chatId]) {
-      this.data.subscriptions[chatId] = { douyu: [], bilibili: [] };
+      this.data.subscriptions[chatId] = { douyu: [], bilibili: [], twitch: [] };
     }
 
     const roomIdStr = String(roomId);
@@ -133,7 +137,7 @@ export class Storage {
    * @returns {Object} { douyu: [], bilibili: [] }
    */
   getAllSubscriptions(chatId) {
-    return this.data.subscriptions[chatId] || { douyu: [], bilibili: [] };
+    return this.data.subscriptions[chatId] || { douyu: [], bilibili: [], twitch: [] };
   }
 
   /**
