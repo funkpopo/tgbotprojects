@@ -1,19 +1,20 @@
 # 直播开播通知 Telegram Bot
 
-一个用于接收斗鱼和B站直播开播通知的 Telegram Bot。
+一个用于接收斗鱼、B站和 Twitch 直播开播通知的 Telegram Bot。
 
 ## 功能特性
 
-- 支持斗鱼和B站两个平台
+- 支持斗鱼、B站和 Twitch 三个平台
 - 订阅主播，开播时自动推送通知
 - 支持多用户订阅
 - 查看订阅列表和直播状态
 - 数据持久化存储
+- 内置快捷菜单（订阅列表、帮助）
 
 ## 安装
 
 ```bash
-cd douyu-live-bot
+cd sub-bot
 npm install
 ```
 
@@ -29,20 +30,28 @@ cp .env.example .env
 3. 编辑 `.env` 文件：
 ```
 TELEGRAM_BOT_TOKEN=your_bot_token_here
-CHECK_INTERVAL=60
+CHECK_INTERVAL=180
 DATA_FILE=./data/subscriptions.json
 ```
+
+> Twitch 使用公开接口，无需额外 API 凭证。
 
 ## 运行
 
 ```bash
-# 设置环境变量方式运行
-export TELEGRAM_BOT_TOKEN=your_token
-npm start
-
-# 或者使用 .env 文件（需要安装 dotenv）
+# 使用 .env 文件（需先安装 dotenv）
 npm install dotenv
 node -r dotenv/config src/index.js
+
+# 或直接设置环境变量
+set TELEGRAM_BOT_TOKEN=your_token   # Windows
+export TELEGRAM_BOT_TOKEN=your_token  # Linux/macOS
+npm start
+```
+
+开发模式（支持热重载）：
+```bash
+npm run dev
 ```
 
 ## Bot 命令
@@ -63,6 +72,14 @@ node -r dotenv/config src/index.js
 | `/blun <房间号>` | 取消B站订阅 |
 | `/blcheck <房间号>` | 查看B站直播状态 |
 
+### Twitch 直播
+
+| 命令 | 说明 |
+|------|------|
+| `/tw <频道名>` | 订阅 Twitch 频道 |
+| `/twun <频道名>` | 取消 Twitch 订阅 |
+| `/twcheck <频道名>` | 查看 Twitch 直播状态 |
+
 ### 通用命令
 
 | 命令 | 说明 |
@@ -74,30 +91,36 @@ node -r dotenv/config src/index.js
 ## 使用示例
 
 ```
-/dy 9999        # 订阅斗鱼房间 9999
-/dyun 9999      # 取消斗鱼房间 9999 订阅
-/dycheck 9999   # 查看斗鱼房间 9999 状态
+/dy 9999           # 订阅斗鱼房间 9999
+/dyun 9999         # 取消斗鱼房间 9999 订阅
+/dycheck 9999      # 查看斗鱼房间 9999 状态
 
-/bl 21452505    # 订阅B站房间 21452505
-/blun 21452505  # 取消B站房间 21452505 订阅
+/bl 21452505       # 订阅B站房间 21452505
+/blun 21452505     # 取消B站房间 21452505 订阅
 /blcheck 21452505  # 查看B站房间 21452505 状态
 
-/list           # 查看所有订阅
+/tw shroud         # 订阅 Twitch 频道 shroud
+/twun shroud       # 取消 Twitch 频道 shroud 订阅
+/twcheck shroud    # 查看 Twitch 频道 shroud 状态
+
+/list              # 查看所有订阅
 ```
 
 ## 项目结构
 
 ```
-douyu-live-bot/
+sub-bot/
 ├── src/
 │   ├── index.js    # 入口文件
 │   ├── bot.js      # Telegram Bot 核心逻辑
 │   ├── douyu.js    # 斗鱼 API 模块
 │   ├── bilibili.js # B站 API 模块
+│   ├── twitch.js   # Twitch API 模块
 │   └── storage.js  # 数据存储模块
 ├── data/           # 数据存储目录
-├── package.json
+├── Dockerfile
 ├── .env.example
+├── package.json
 └── README.md
 ```
 
@@ -119,35 +142,27 @@ pm2 save
 
 ### 使用 Docker
 
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --production
-COPY . .
-CMD ["node", "src/index.js"]
-```
+```bash
+# 构建镜像
+docker build -t live-bot .
 
-### 运行容器
-方式一：使用环境变量
-
+# 方式一：使用环境变量
 docker run -d \
   --name live-bot \
   -e TELEGRAM_BOT_TOKEN=你的Token \
-  -e CHECK_INTERVAL=60 \
+  -e CHECK_INTERVAL=180 \
   -v live-bot-data:/app/data \
   --restart unless-stopped \
   live-bot
 
-
-方式二：使用 .env 文件
-
+# 方式二：使用 .env 文件
 docker run -d \
   --name live-bot \
   --env-file .env \
   -v live-bot-data:/app/data \
   --restart unless-stopped \
   live-bot
+```
 
 ## License
 
